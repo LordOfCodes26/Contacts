@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="package_name">com.goodwy.contacts</string>
+    <string name="package_name">com.android.contacts</string>
     <string name="app_name" translatable="false">Right Contacts</string>
 
     <!-- Release notes -->

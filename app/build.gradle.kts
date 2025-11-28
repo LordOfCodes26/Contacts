@@ -77,9 +77,6 @@ android {
     }
 
     buildTypes {
-        debug {
-            applicationIdSuffix = ".debug"
-        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -91,13 +88,6 @@ android {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
-    }
-
-    flavorDimensions.add("variants")
-    productFlavors {
-        register("core")
-        register("foss")
-        register("gplay")
     }
 
     sourceSets {
@@ -150,6 +140,7 @@ detekt {
 }
 
 dependencies {
+    implementation(project(":commons"))
     implementation(libs.androidx.swiperefreshlayout)
     implementation(libs.autofittextview)
     implementation(libs.ezvcard)
@@ -159,7 +150,6 @@ dependencies {
     detektPlugins(libs.compose.detekt)
 
     //Goodwy
-    implementation(libs.goodwy.commons)
     implementation(libs.behavio.rule)
     implementation(libs.rx.animation)
     implementation(libs.bundles.lifecycle)
