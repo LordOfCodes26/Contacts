@@ -58,14 +58,15 @@ open class SimpleActivity : BaseSimpleActivity() {
         }
     }
 
-    protected fun getTabIcon(position: Int): Drawable {
+    protected fun getTabIcon(position: Int): Int {
         val drawableId = when (position) {
             LOCATION_FAVORITES_TAB -> com.goodwy.commons.R.drawable.ic_star_vector
             LOCATION_CONTACTS_TAB -> com.goodwy.commons.R.drawable.ic_person_rounded
             else -> R.drawable.ic_people_rounded
         }
 
-        return resources.getColoredDrawableWithColor(drawableId, getProperTextColor())
+//        return resources.getColoredDrawableWithColor(drawableId, getProperTextColor())
+        return drawableId
     }
 
     protected fun getTabLabel(position: Int): String {

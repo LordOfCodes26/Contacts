@@ -69,87 +69,87 @@ class SettingsActivity : SimpleActivity() {
         updateMaterialActivityViews(binding.settingsCoordinator, binding.settingsHolder, useTransparentNavigation = true, useTopSearchMenu = false)
         setupMaterialScrollListener(binding.settingsNestedScrollview, binding.settingsToolbar)
 
-        if (isPlayStoreInstalled()) {
-            //PlayStore
-            purchaseHelper.initBillingClient()
-            val iapList: ArrayList<String> = arrayListOf(productIdX1, productIdX2, productIdX3)
-            val subList: ArrayList<String> = arrayListOf(subscriptionIdX1, subscriptionIdX2, subscriptionIdX3, subscriptionYearIdX1, subscriptionYearIdX2, subscriptionYearIdX3)
-            purchaseHelper.retrieveDonation(iapList, subList)
-
-            purchaseHelper.isIapPurchased.observe(this) {
-                when (it) {
-                    is Tipping.Succeeded -> {
-                        config.isPro = true
-                        updatePro()
-                    }
-                    is Tipping.NoTips -> {
-                        config.isPro = false
-                        updatePro()
-                    }
-                    is Tipping.FailedToLoad -> {
-                    }
-                }
-            }
-
-            purchaseHelper.isSupPurchased.observe(this) {
-                when (it) {
-                    is Tipping.Succeeded -> {
-                        config.isProSubs = true
-                        updatePro()
-                    }
-                    is Tipping.NoTips -> {
-                        config.isProSubs = false
-                        updatePro()
-                    }
-                    is Tipping.FailedToLoad -> {
-                    }
-                }
-            }
-        }
-        if (isRuStoreInstalled()) {
-            //RuStore
-            ruStoreHelper = RuStoreHelper()
-            ruStoreHelper!!.checkPurchasesAvailability(this@SettingsActivity)
-
-            lifecycleScope.launch {
-                ruStoreHelper!!.eventStart
-                    .flowWithLifecycle(lifecycle)
-                    .collect { event ->
-                        handleEventStart(event)
-                    }
-            }
-
-            lifecycleScope.launch {
-                ruStoreHelper!!.statePurchased
-                    .flowWithLifecycle(lifecycle)
-                    .collect { state ->
-                        //update of purchased
-                        if (!state.isLoading && ruStoreIsConnected) {
-                            baseConfig.isProRuStore = state.purchases.firstOrNull() != null
-                            updatePro()
-                        }
-                    }
-            }
-        }
+//        if (isPlayStoreInstalled()) {
+//            //PlayStore
+//            purchaseHelper.initBillingClient()
+//            val iapList: ArrayList<String> = arrayListOf(productIdX1, productIdX2, productIdX3)
+//            val subList: ArrayList<String> = arrayListOf(subscriptionIdX1, subscriptionIdX2, subscriptionIdX3, subscriptionYearIdX1, subscriptionYearIdX2, subscriptionYearIdX3)
+//            purchaseHelper.retrieveDonation(iapList, subList)
+//
+//            purchaseHelper.isIapPurchased.observe(this) {
+//                when (it) {
+//                    is Tipping.Succeeded -> {
+//                        config.isPro = true
+//                        updatePro()
+//                    }
+//                    is Tipping.NoTips -> {
+//                        config.isPro = false
+//                        updatePro()
+//                    }
+//                    is Tipping.FailedToLoad -> {
+//                    }
+//                }
+//            }
+//
+//            purchaseHelper.isSupPurchased.observe(this) {
+//                when (it) {
+//                    is Tipping.Succeeded -> {
+//                        config.isProSubs = true
+//                        updatePro()
+//                    }
+//                    is Tipping.NoTips -> {
+//                        config.isProSubs = false
+//                        updatePro()
+//                    }
+//                    is Tipping.FailedToLoad -> {
+//                    }
+//                }
+//            }
+//        }
+//        if (isRuStoreInstalled()) {
+//            //RuStore
+//            ruStoreHelper = RuStoreHelper()
+//            ruStoreHelper!!.checkPurchasesAvailability(this@SettingsActivity)
+//
+//            lifecycleScope.launch {
+//                ruStoreHelper!!.eventStart
+//                    .flowWithLifecycle(lifecycle)
+//                    .collect { event ->
+//                        handleEventStart(event)
+//                    }
+//            }
+//
+//            lifecycleScope.launch {
+//                ruStoreHelper!!.statePurchased
+//                    .flowWithLifecycle(lifecycle)
+//                    .collect { state ->
+//                        //update of purchased
+//                        if (!state.isLoading && ruStoreIsConnected) {
+//                            baseConfig.isProRuStore = state.purchases.firstOrNull() != null
+//                            updatePro()
+//                        }
+//                    }
+//            }
+//        }
     }
 
     override fun onResume() {
         super.onResume()
         setupToolbar(binding.settingsToolbar, NavigationIcon.Arrow)
 
-        setupPurchaseThankYou()
+//        setupPurchaseThankYou()
 
-        setupCustomizeColors()
+//        setupCustomizeColors()
         setupShowDialpadButton()
-        setupOverflowIcon()
-        setupFloatingButtonStyle()
+//        setupOverflowIcon()
+//        setupFloatingButtonStyle()
         setupUseColoredContacts()
         setupContactsColorList()
 
         setupManageShownContactFields()
         setupMergeDuplicateContacts()
         setupShowCallConfirmation()
-        setupShowPrivateContacts()
+//        setupShowPrivateContacts()
         setupOnContactClick()
         setupShowContactsWithNumbers()
         setupFormatPhoneNumbers()
@@ -186,8 +186,8 @@ class SettingsActivity : SimpleActivity() {
         setupInfoAutomaticBackups()
         setupManageAutomaticBackups()
 
-        setupTipJar()
-        setupAbout()
+//        setupTipJar()
+//        setupAbout()
 
         updateTextColors(binding.settingsHolder)
 
@@ -198,7 +198,7 @@ class SettingsActivity : SimpleActivity() {
             binding.settingsSwipeGesturesLabel,
             binding.settingsListViewLabel,
             binding.settingsBackupsLabel,
-            binding.settingsOtherLabel).forEach {
+            /*binding.settingsOtherLabel*/).forEach {
             it.setTextColor(getProperPrimaryColor())
         }
 
@@ -209,47 +209,47 @@ class SettingsActivity : SimpleActivity() {
             binding.settingsSwipeGesturesHolder,
             binding.settingsListViewHolder,
             binding.settingsBackupsHolder,
-            binding.settingsOtherHolder
+//            binding.settingsOtherHolder
         ).forEach {
             it.setCardBackgroundColor(getSurfaceColor())
         }
 
         arrayOf(
-            binding.settingsCustomizeColorsChevron,
+//            binding.settingsCustomizeColorsChevron,
             binding.settingsManageShownTabsChevron,
             binding.settingsManageContactFieldsChevron,
             binding.settingsManageContactFieldsChevron,
             binding.contactsImportChevron,
             binding.contactsExportChevron,
             binding.settingsManageAutomaticBackupsChevron,
-            binding.settingsTipJarChevron,
-            binding.settingsAboutChevron
+//            binding.settingsTipJarChevron,
+//            binding.settingsAboutChevron
         ).forEach {
             it.applyColorFilter(getProperTextColor())
         }
     }
 
-    private fun setupPurchaseThankYou() = binding.apply {
-        settingsPurchaseThankYouHolder.beGoneIf(isPro())
-        settingsPurchaseThankYouHolder.onClick = { launchPurchase() }
-    }
+//    private fun setupPurchaseThankYou() = binding.apply {
+//        settingsPurchaseThankYouHolder.beGoneIf(isPro())
+//        settingsPurchaseThankYouHolder.onClick = { launchPurchase() }
+//    }
 
-    private fun setupCustomizeColors() = binding.apply {
-        settingsCustomizeColorsHolder.setOnClickListener {
-            startCustomizationActivity(
-                showAccentColor = true,
-                productIdList = arrayListOf(productIdX1, productIdX2, productIdX3),
-                productIdListRu = arrayListOf(productIdX1, productIdX2, productIdX3),
-                subscriptionIdList = arrayListOf(subscriptionIdX1, subscriptionIdX2, subscriptionIdX3),
-                subscriptionIdListRu = arrayListOf(subscriptionIdX1, subscriptionIdX2, subscriptionIdX3),
-                subscriptionYearIdList = arrayListOf(subscriptionYearIdX1, subscriptionYearIdX2, subscriptionYearIdX3),
-                subscriptionYearIdListRu = arrayListOf(subscriptionYearIdX1, subscriptionYearIdX2, subscriptionYearIdX3),
-                playStoreInstalled = isPlayStoreInstalled(),
-                ruStoreInstalled = isRuStoreInstalled(),
-                showAppIconColor = true
-            )
-        }
-    }
+//    private fun setupCustomizeColors() = binding.apply {
+//        settingsCustomizeColorsHolder.setOnClickListener {
+//            startCustomizationActivity(
+//                showAccentColor = true,
+//                productIdList = arrayListOf(productIdX1, productIdX2, productIdX3),
+//                productIdListRu = arrayListOf(productIdX1, productIdX2, productIdX3),
+//                subscriptionIdList = arrayListOf(subscriptionIdX1, subscriptionIdX2, subscriptionIdX3),
+//                subscriptionIdListRu = arrayListOf(subscriptionIdX1, subscriptionIdX2, subscriptionIdX3),
+//                subscriptionYearIdList = arrayListOf(subscriptionYearIdX1, subscriptionYearIdX2, subscriptionYearIdX3),
+//                subscriptionYearIdListRu = arrayListOf(subscriptionYearIdX1, subscriptionYearIdX2, subscriptionYearIdX3),
+//                playStoreInstalled = isPlayStoreInstalled(),
+//                ruStoreInstalled = isRuStoreInstalled(),
+//                showAppIconColor = true
+//            )
+//        }
+//    }
 
     private fun setupManageShownContactFields() {
         binding.settingsManageContactFieldsHolder.setOnClickListener {
@@ -500,26 +500,26 @@ class SettingsActivity : SimpleActivity() {
         }
     }
 
-    private fun setupShowPrivateContacts() {
-        binding.apply {
-            //val simpleDialer = "com.goodwy.dialer"
-            //val simpleDialerDebug = "com.goodwy.dialer.debug"
-            //settings_show_private_contacts_holder.beVisibleIf(isPackageInstalled(simpleDialer) && isPackageInstalled(simpleDialerDebug))
-            settingsShowPrivateContacts.isChecked = config.showPrivateContacts
-            settingsShowPrivateContactsHolder.setOnClickListener {
-                settingsShowPrivateContacts.toggle()
-                config.showPrivateContacts = settingsShowPrivateContacts.isChecked
-            }
-            settingsShowPrivateContactsFaq.imageTintList = ColorStateList.valueOf(getProperTextColor())
-            val faqItems = arrayListOf(
-                FAQItem(com.goodwy.strings.R.string.faq_100_title_commons_g, com.goodwy.strings.R.string.faq_100_text_commons_g),
-                FAQItem(com.goodwy.strings.R.string.faq_101_title_commons_g, com.goodwy.strings.R.string.faq_101_text_commons_g, R.string.phone_storage_hidden),
-            )
-            settingsShowPrivateContactsFaq.setOnClickListener {
-                openFAQ(faqItems)
-            }
-        }
-    }
+//    private fun setupShowPrivateContacts() {
+//        binding.apply {
+//            //val simpleDialer = "com.goodwy.dialer"
+//            //val simpleDialerDebug = "com.goodwy.dialer.debug"
+//            //settings_show_private_contacts_holder.beVisibleIf(isPackageInstalled(simpleDialer) && isPackageInstalled(simpleDialerDebug))
+//            settingsShowPrivateContacts.isChecked = config.showPrivateContacts
+//            settingsShowPrivateContactsHolder.setOnClickListener {
+//                settingsShowPrivateContacts.toggle()
+//                config.showPrivateContacts = settingsShowPrivateContacts.isChecked
+//            }
+//            settingsShowPrivateContactsFaq.imageTintList = ColorStateList.valueOf(getProperTextColor())
+//            val faqItems = arrayListOf(
+//                FAQItem(com.goodwy.strings.R.string.faq_100_title_commons_g, com.goodwy.strings.R.string.faq_100_text_commons_g),
+//                FAQItem(com.goodwy.strings.R.string.faq_101_title_commons_g, com.goodwy.strings.R.string.faq_101_text_commons_g, R.string.phone_storage_hidden),
+//            )
+//            settingsShowPrivateContactsFaq.setOnClickListener {
+//                openFAQ(faqItems)
+//            }
+//        }
+//    }
 
     private fun setupOnContactClick() {
         binding.apply {
@@ -747,71 +747,71 @@ class SettingsActivity : SimpleActivity() {
         }
     }
 
-    private fun setupOverflowIcon() {
-        binding.apply {
-            settingsOverflowIcon.applyColorFilter(getProperTextColor())
-            settingsOverflowIcon.setImageResource(getOverflowIcon(baseConfig.overflowIcon))
-            settingsOverflowIconHolder.setOnClickListener {
-                val items = arrayListOf(
-                    com.goodwy.commons.R.drawable.ic_more_horiz,
-                    com.goodwy.commons.R.drawable.ic_three_dots_vector,
-                    com.goodwy.commons.R.drawable.ic_more_horiz_round
-                )
+//    private fun setupOverflowIcon() {
+//        binding.apply {
+//            settingsOverflowIcon.applyColorFilter(getProperTextColor())
+//            settingsOverflowIcon.setImageResource(getOverflowIcon(baseConfig.overflowIcon))
+//            settingsOverflowIconHolder.setOnClickListener {
+//                val items = arrayListOf(
+//                    com.goodwy.commons.R.drawable.ic_more_horiz,
+//                    com.goodwy.commons.R.drawable.ic_three_dots_vector,
+//                    com.goodwy.commons.R.drawable.ic_more_horiz_round
+//                )
+//
+//                IconListDialog(
+//                    activity = this@SettingsActivity,
+//                    items = items,
+//                    checkedItemId = baseConfig.overflowIcon + 1,
+//                    defaultItemId = OVERFLOW_ICON_HORIZONTAL + 1,
+//                    titleId = com.goodwy.strings.R.string.overflow_icon,
+//                    size = pixels(com.goodwy.commons.R.dimen.normal_icon_size).toInt(),
+//                    color = getProperTextColor()
+//                ) { wasPositivePressed, newValue ->
+//                    if (wasPositivePressed) {
+//                        if (baseConfig.overflowIcon != newValue - 1) {
+//                            baseConfig.overflowIcon = newValue - 1
+//                            settingsOverflowIcon.setImageResource(getOverflowIcon(baseConfig.overflowIcon))
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//    }
 
-                IconListDialog(
-                    activity = this@SettingsActivity,
-                    items = items,
-                    checkedItemId = baseConfig.overflowIcon + 1,
-                    defaultItemId = OVERFLOW_ICON_HORIZONTAL + 1,
-                    titleId = com.goodwy.strings.R.string.overflow_icon,
-                    size = pixels(com.goodwy.commons.R.dimen.normal_icon_size).toInt(),
-                    color = getProperTextColor()
-                ) { wasPositivePressed, newValue ->
-                    if (wasPositivePressed) {
-                        if (baseConfig.overflowIcon != newValue - 1) {
-                            baseConfig.overflowIcon = newValue - 1
-                            settingsOverflowIcon.setImageResource(getOverflowIcon(baseConfig.overflowIcon))
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun setupFloatingButtonStyle() {
-        binding.apply {
-            settingsFloatingButtonStyle.applyColorFilter(getProperTextColor())
-            settingsFloatingButtonStyle.setImageResource(
-                if (baseConfig.materialDesign3) com.goodwy.commons.R.drawable.squircle_bg else com.goodwy.commons.R.drawable.ic_circle_filled
-            )
-            settingsFloatingButtonStyleHolder.setOnClickListener {
-                val items = arrayListOf(
-                    com.goodwy.commons.R.drawable.ic_circle_filled,
-                    com.goodwy.commons.R.drawable.squircle_bg
-                )
-
-                IconListDialog(
-                    activity = this@SettingsActivity,
-                    items = items,
-                    checkedItemId = if (baseConfig.materialDesign3) 2 else 1,
-                    defaultItemId = 1,
-                    titleId = com.goodwy.strings.R.string.floating_button_style,
-                    size = pixels(com.goodwy.commons.R.dimen.normal_icon_size).toInt(),
-                    color = getProperTextColor()
-                ) { wasPositivePressed, newValue ->
-                    if (wasPositivePressed) {
-                        if (newValue != if (baseConfig.materialDesign3) 2 else 1) {
-                            baseConfig.materialDesign3 = newValue == 2
-                            settingsFloatingButtonStyle.setImageResource(
-                                if (newValue == 2) com.goodwy.commons.R.drawable.squircle_bg else com.goodwy.commons.R.drawable.ic_circle_filled
-                            )
-                            config.needRestart = true
-                        }
-                    }
-                }
-            }
-        }
-    }
+//    private fun setupFloatingButtonStyle() {
+//        binding.apply {
+//            settingsFloatingButtonStyle.applyColorFilter(getProperTextColor())
+//            settingsFloatingButtonStyle.setImageResource(
+//                if (baseConfig.materialDesign3) com.goodwy.commons.R.drawable.squircle_bg else com.goodwy.commons.R.drawable.ic_circle_filled
+//            )
+//            settingsFloatingButtonStyleHolder.setOnClickListener {
+//                val items = arrayListOf(
+//                    com.goodwy.commons.R.drawable.ic_circle_filled,
+//                    com.goodwy.commons.R.drawable.squircle_bg
+//                )
+//
+//                IconListDialog(
+//                    activity = this@SettingsActivity,
+//                    items = items,
+//                    checkedItemId = if (baseConfig.materialDesign3) 2 else 1,
+//                    defaultItemId = 1,
+//                    titleId = com.goodwy.strings.R.string.floating_button_style,
+//                    size = pixels(com.goodwy.commons.R.dimen.normal_icon_size).toInt(),
+//                    color = getProperTextColor()
+//                ) { wasPositivePressed, newValue ->
+//                    if (wasPositivePressed) {
+//                        if (newValue != if (baseConfig.materialDesign3) 2 else 1) {
+//                            baseConfig.materialDesign3 = newValue == 2
+//                            settingsFloatingButtonStyle.setImageResource(
+//                                if (newValue == 2) com.goodwy.commons.R.drawable.squircle_bg else com.goodwy.commons.R.drawable.ic_circle_filled
+//                            )
+//                            config.needRestart = true
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//    }
 
     private fun setupUseIconTabs() {
         binding.apply {
@@ -994,23 +994,23 @@ class SettingsActivity : SimpleActivity() {
             }
         }
     }
-
-    private fun setupTipJar() = binding.apply {
-        settingsTipJarHolder.apply {
-            beVisibleIf(isPro())
-            background.applyColorFilter(getColoredMaterialStatusBarColor())
-            setOnClickListener {
-                launchPurchase()
-            }
-        }
-    }
-
-    private fun setupAbout() = binding.apply {
-        settingsAboutVersion.text = "Version: " + BuildConfig.VERSION_NAME
-        settingsAboutHolder.setOnClickListener {
-            launchAbout()
-        }
-    }
+//
+//    private fun setupTipJar() = binding.apply {
+//        settingsTipJarHolder.apply {
+//            beVisibleIf(isPro())
+//            background.applyColorFilter(getColoredMaterialStatusBarColor())
+//            setOnClickListener {
+//                launchPurchase()
+//            }
+//        }
+//    }
+//
+//    private fun setupAbout() = binding.apply {
+//        settingsAboutVersion.text = "Version: " + BuildConfig.VERSION_NAME
+//        settingsAboutHolder.setOnClickListener {
+//            launchAbout()
+//        }
+//    }
 
     private fun launchPurchase() {
         startPurchaseActivity(
@@ -1035,42 +1035,42 @@ class SettingsActivity : SimpleActivity() {
         }
     }
 
-    private fun updatePro(isPro: Boolean = isPro()) {
-        binding.apply {
-            settingsSwipeLeftActionHolder.alpha = if (isPro) 1f else 0.4f
-            settingsPurchaseThankYouHolder.beGoneIf(isPro)
-            settingsTipJarHolder.beVisibleIf(isPro)
-        }
-    }
+//    private fun updatePro(isPro: Boolean = isPro()) {
+//        binding.apply {
+//            settingsSwipeLeftActionHolder.alpha = if (isPro) 1f else 0.4f
+//            settingsPurchaseThankYouHolder.beGoneIf(isPro)
+//            settingsTipJarHolder.beVisibleIf(isPro)
+//        }
+//    }
 
-    private fun updateProducts() {
-        val productList: ArrayList<String> = arrayListOf(productIdX1, productIdX2, productIdX3, subscriptionIdX1, subscriptionIdX2, subscriptionIdX3, subscriptionYearIdX1, subscriptionYearIdX2, subscriptionYearIdX3)
-        ruStoreHelper!!.getProducts(productList)
-    }
+//    private fun updateProducts() {
+//        val productList: ArrayList<String> = arrayListOf(productIdX1, productIdX2, productIdX3, subscriptionIdX1, subscriptionIdX2, subscriptionIdX3, subscriptionYearIdX1, subscriptionYearIdX2, subscriptionYearIdX3)
+//        ruStoreHelper!!.getProducts(productList)
+//    }
 
-    private fun handleEventStart(event: StartPurchasesEvent) {
-        when (event) {
-            is StartPurchasesEvent.PurchasesAvailability -> {
-                when (event.availability) {
-                    is FeatureAvailabilityResult.Available -> {
-                        //Process purchases available
-                        updateProducts()
-                        ruStoreIsConnected = true
-                    }
-
-                    is FeatureAvailabilityResult.Unavailable -> {
-                        //toast(event.availability.cause.message ?: "Process purchases unavailable", Toast.LENGTH_LONG)
-                    }
-
-                    else -> {}
-                }
-            }
-
-            is StartPurchasesEvent.Error -> {
-                //toast(event.throwable.message ?: "Process unknown error", Toast.LENGTH_LONG)
-            }
-        }
-    }
+//    private fun handleEventStart(event: StartPurchasesEvent) {
+//        when (event) {
+//            is StartPurchasesEvent.PurchasesAvailability -> {
+//                when (event.availability) {
+//                    is FeatureAvailabilityResult.Available -> {
+//                        //Process purchases available
+////                        updateProducts()
+//                        ruStoreIsConnected = true
+//                    }
+//
+//                    is FeatureAvailabilityResult.Unavailable -> {
+//                        //toast(event.availability.cause.message ?: "Process purchases unavailable", Toast.LENGTH_LONG)
+//                    }
+//
+//                    else -> {}
+//                }
+//            }
+//
+//            is StartPurchasesEvent.Error -> {
+//                //toast(event.throwable.message ?: "Process unknown error", Toast.LENGTH_LONG)
+//            }
+//        }
+//    }
 
     private fun showSnackbar(view: View) {
         view.performHapticFeedback()

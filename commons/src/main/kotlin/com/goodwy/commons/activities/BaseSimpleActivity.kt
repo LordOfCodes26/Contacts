@@ -439,7 +439,7 @@ abstract class BaseSimpleActivity : AppCompatActivity() {
                 finish()
             }
         }
-    
+
         updateTopBarColors(toolbar, statusBarColor)
 
         if (!useTopSearchMenu) {

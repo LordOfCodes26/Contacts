@@ -89,7 +89,7 @@ class InsertOrEditContactActivity : SimpleActivity(), RefreshContactsListener {
     override fun onResume() {
         super.onResume()
         updateMenuColors()
-        setupTabColors()
+//        setupTabColors()
     }
 
     private fun setupOptionsMenu() {
@@ -199,27 +199,30 @@ class InsertOrEditContactActivity : SimpleActivity(), RefreshContactsListener {
         binding.insertEditTabsHolder.removeAllTabs()
         contactsFavoritesList.forEachIndexed { index, value ->
             if (config.showTabs and value != 0) {
-                binding.insertEditTabsHolder.newTab().setCustomView(com.goodwy.commons.R.layout.bottom_tablayout_item).apply tab@{
-                    customView?.let {
-                        BottomTablayoutItemBinding.bind(it)
-                    }?.apply {
-                        tabItemIcon.setImageDrawable(getTabIcon(index))
-                        tabItemLabel.text = getTabLabel(index)
-                        tabItemLabel.beGoneIf(config.useIconTabs)
-                        binding.insertEditTabsHolder.addTab(this@tab)
-                    }
-                }
+//                binding.insertEditTabsHolder.newTab().setCustomView(com.goodwy.commons.R.layout.bottom_tablayout_item).apply tab@{
+//                    customView?.let {
+//                        BottomTablayoutItemBinding.bind(it)
+//                    }?.apply {
+//                        tabItemIcon.setImageDrawable(getTabIcon(index))
+//                        tabItemLabel.text = getTabLabel(index)
+//                        tabItemLabel.beGoneIf(config.useIconTabs)
+//                        binding.insertEditTabsHolder.addTab(this@tab)
+//                    }
+//                }
+                binding.insertEditTabsHolder.addTab(binding.insertEditTabsHolder.newTab()
+                    .setIcon(getTabIcon(index))
+                    .setText(getTabLabel(index)))
             }
         }
 
         binding.insertEditTabsHolder.onTabSelectionChanged(
             tabUnselectedAction = {
-                updateBottomTabItemColors(it.customView, false, getDeselectedTabDrawableIds()[it.position])
+                updateBottomTabItemColors(null, false, getDeselectedTabDrawableIds()[it.position])
             },
             tabSelectedAction = {
                 binding.insertEditMenu.closeSearch()
                 binding.viewPager.currentItem = it.position
-                updateBottomTabItemColors(it.customView, true, getSelectedTabDrawableIds()[it.position])
+                updateBottomTabItemColors(null, true, getSelectedTabDrawableIds()[it.position])
             }
         )
 
@@ -241,28 +244,28 @@ class InsertOrEditContactActivity : SimpleActivity(), RefreshContactsListener {
         )
     }
 
-    private fun setupTabColors() {
-        val activeView = binding.insertEditTabsHolder.getTabAt(binding.viewPager.currentItem)?.customView
-        updateBottomTabItemColors(activeView, true, getSelectedTabDrawableIds()[binding.viewPager.currentItem])
-
-        getInactiveTabIndexes(binding.viewPager.currentItem).forEach { index ->
-            val inactiveView = binding.insertEditTabsHolder.getTabAt(index)?.customView
-            updateBottomTabItemColors(inactiveView, false, getDeselectedTabDrawableIds()[index])
-        }
-
-        val bottomBarColor =
-            if (isDynamicTheme() && !isSystemInDarkMode()) getColoredMaterialStatusBarColor()
-            else getSurfaceColor()
-        binding.insertEditTabsHolder.setBackgroundColor(bottomBarColor)
-        if (binding.insertEditTabsHolder.tabCount != 1) updateNavigationBarColor(bottomBarColor)
-        else {
-            // TODO TRANSPARENT Navigation Bar
-            setWindowTransparency(true) { _, bottomNavigationBarSize, leftNavigationBarSize, rightNavigationBarSize ->
-                binding.insertEditCoordinator.setPadding(leftNavigationBarSize, 0, rightNavigationBarSize, 0)
-
-            }
-        }
-    }
+//    private fun setupTabColors() {
+//        val activeView = binding.insertEditTabsHolder.getTabAt(binding.viewPager.currentItem)?.customView
+//        updateBottomTabItemColors(activeView, true, getSelectedTabDrawableIds()[binding.viewPager.currentItem])
+//
+//        getInactiveTabIndexes(binding.viewPager.currentItem).forEach { index ->
+//            val inactiveView = binding.insertEditTabsHolder.getTabAt(index)?.customView
+//            updateBottomTabItemColors(inactiveView, false, getDeselectedTabDrawableIds()[index])
+//        }
+//
+//        val bottomBarColor =
+//            if (isDynamicTheme() && !isSystemInDarkMode()) getColoredMaterialStatusBarColor()
+//            else getSurfaceColor()
+//        binding.insertEditTabsHolder.setBackgroundColor(bottomBarColor)
+//        if (binding.insertEditTabsHolder.tabCount != 1) updateNavigationBarColor(bottomBarColor)
+//        else {
+//            // TODO TRANSPARENT Navigation Bar
+//            setWindowTransparency(true) { _, bottomNavigationBarSize, leftNavigationBarSize, rightNavigationBarSize ->
+//                binding.insertEditCoordinator.setPadding(leftNavigationBarSize, 0, rightNavigationBarSize, 0)
+//
+//            }
+//        }
+//    }
 
     private fun getInactiveTabIndexes(activeIndex: Int) = (0 until binding.insertEditTabsHolder.tabCount).filter { it != activeIndex }
 

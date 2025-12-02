@@ -74,14 +74,11 @@
             android:layout_above="@+id/insert_edit_tabs_holder"
             android:layout_below="@+id/select_contact_label" />
 
-        <com.google.android.material.tabs.TabLayout
+        <com.goodwy.commons.views.MyLiquidNavigationView
             android:id="@+id/insert_edit_tabs_holder"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_alignParentBottom="true"
-            app:tabIndicator="@null"
-            app:tabMinWidth="150dp"
-            app:tabRippleColor="@null"/>
+            android:layout_alignParentBottom="true"/>
 
     </RelativeLayout>
 

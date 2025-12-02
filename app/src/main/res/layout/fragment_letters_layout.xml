@@ -6,7 +6,7 @@
     <RelativeLayout
         android:id="@+id/fragment_wrapper"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="match_parent">
 
         <com.goodwy.commons.views.MyTextView
             android:id="@+id/fragment_placeholder"
