@@ -131,7 +131,7 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
         super.onResume()
         refreshMenuItems()
 
-        if (storedShowTabs != config.showTabs ||storedShowPhoneNumbers != config.showPhoneNumbers) {
+        if (storedShowTabs != config.showTabs || storedShowPhoneNumbers != config.showPhoneNumbers) {
             System.exit(0)
             return
         }
@@ -233,7 +233,7 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
                 val res: ArrayList<String> =
                     resultData.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS) as ArrayList<String>
 
-                val speechToText =  Objects.requireNonNull(res)[0]
+                val speechToText = Objects.requireNonNull(res)[0]
                 if (speechToText.isNotEmpty()) {
                     binding.mainMenu.setText(speechToText)
                 }
@@ -289,7 +289,7 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
                 R.id.change_view_type -> changeViewType()
                 R.id.column_count -> changeColumnCount()
                 R.id.settings -> launchSettings()
-                R.id.about -> launchAbout()
+//                R.id.about -> launchAbout()
                 else -> return@setOnMenuItemClickListener false
             }
             return@setOnMenuItemClickListener true
@@ -612,7 +612,7 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
 
             override fun onPageSelected(position: Int) {
 //                if (config.bottomNavigationBar) {
-                    binding.mainTabsHolder.getTabAt(position)?.select()
+                binding.mainTabsHolder.getTabAt(position)?.select()
 //                } else binding.mainTopTabsHolder.getTabAt(position)?.select()
 
                 getAllFragments().forEach {
@@ -753,9 +753,11 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
 //                        binding.mainTabsHolder.addTab(this@tab)
 //                    }
 //                }
-                binding.mainTabsHolder.addTab(binding.mainTabsHolder.newTab()
-                    .setIcon(getTabIcon(index))
-                    .setText(getTabLabel(index)))
+                binding.mainTabsHolder.addTab(
+                    binding.mainTabsHolder.newTab()
+                        .setIcon(getTabIcon(index))
+                        .setText(getTabLabel(index))
+                )
             }
         }
 
@@ -811,8 +813,13 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
         val simpleDialerDebug = "com.goodwy.dialer.debug"
         if ((0..config.appRecommendationDialogCount).random() == 2 && (!isPackageInstalled(simpleDialer) && !isPackageInstalled(simpleDialerDebug))) {
             runOnUiThread {
-                NewAppDialog(this, simpleDialer, getString(com.goodwy.strings.R.string.recommendation_dialog_dialer_g), getString(com.goodwy.commons.R.string.right_dialer),
-                    AppCompatResources.getDrawable(this, R.drawable.ic_launcher_dialer)) {}
+                NewAppDialog(
+                    this,
+                    simpleDialer,
+                    getString(com.goodwy.strings.R.string.recommendation_dialog_dialer_g),
+                    getString(com.goodwy.commons.R.string.right_dialer),
+                    AppCompatResources.getDrawable(this, R.drawable.ic_launcher_dialer)
+                ) {}
             }
         } else {
             Intent(Intent.ACTION_DIAL).apply {
@@ -843,7 +850,11 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
 
         if (binding.viewPager.adapter == null) {
             binding.viewPager.adapter = ViewPagerAdapter(this, tabsList, config.showTabs)
-            binding.viewPager.currentItem = getDefaultTab()
+            Handler().post {
+                val index = getDefaultTab()
+                binding.viewPager.setCurrentItem(index, false)
+                binding.mainTabsHolder.getTabAt(index)?.select()
+            }
         }
 
         ContactsHelper(this).getContacts { contacts ->
@@ -869,7 +880,7 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
             if (refreshTabsMask and TAB_GROUPS != 0) {
                 findViewById<MyViewPagerFragment<*>>(R.id.groups_fragment)?.apply {
 //                    if (refreshTabsMask == TAB_GROUPS) {
-                        skipHashComparing = true
+                    skipHashComparing = true
 //                    }
                     refreshContacts(contacts)
                 }
