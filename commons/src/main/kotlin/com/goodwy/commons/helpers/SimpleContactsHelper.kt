@@ -36,10 +36,14 @@ class SimpleContactsHelper(val context: Context) {
         ensureBackgroundThread {
             SimpleContact.collator = Collator.getInstance(context.sysLocale())
             val names = getContactNames(favoritesOnly)
+            // Convert names list to HashMap for O(1) lookup instead of O(n)
+            val namesMap = names.associateBy { it.rawId }
+            
             var allContacts = getContactPhoneNumbers(favoritesOnly)
+            // Use HashMap lookup instead of firstOrNull for O(1) performance
             allContacts.forEach {
                 val contactId = it.rawId
-                val contact = names.firstOrNull { it.rawId == contactId }
+                val contact = namesMap[contactId]
                 val name = contact?.name ?: it.phoneNumbers.firstOrNull()?.value
                 if (name != null) {
                     it.name = name
@@ -59,6 +63,8 @@ class SimpleContactsHelper(val context: Context) {
             // if there are duplicate contacts with the same name, while the first one has phone numbers 1234 and 4567, second one has only 4567,
             // use just the first contact
             val contactsToRemove = ArrayList<SimpleContact>()
+            // Convert to HashMap for O(1) lookup during duplicate removal
+            val contactsMap = allContacts.associateBy { it.rawId }
             allContacts.groupBy { it.name }.forEach {
                 val contacts = it.value.toMutableList() as ArrayList<SimpleContact>
                 if (contacts.size > 1) {
@@ -67,7 +73,7 @@ class SimpleContactsHelper(val context: Context) {
                         val multipleNumbersContact = contacts.first()
                         contacts.subList(1, contacts.size).forEach { contact ->
                             if (contact.phoneNumbers.all { multipleNumbersContact.doesContainPhoneNumber(it.normalizedNumber) }) {
-                                val contactToRemove = allContacts.firstOrNull { it.rawId == contact.rawId }
+                                val contactToRemove = contactsMap[contact.rawId]
                                 if (contactToRemove != null) {
                                     contactsToRemove.add(contactToRemove)
                                 }
@@ -77,29 +83,31 @@ class SimpleContactsHelper(val context: Context) {
                 }
             }
 
-            contactsToRemove.forEach {
-                allContacts.remove(it)
-            }
+            // Use removeAll for better performance than individual removes
+            allContacts.removeAll(contactsToRemove)
 
+            // Convert allContacts to HashMap for O(1) lookup
+            val contactsByIdMap = allContacts.associateBy { it.rawId }
+            
             val birthdays = getContactEvents(true)
             var size = birthdays.size
             for (i in 0 until size) {
                 val key = birthdays.keyAt(i)
-                allContacts.firstOrNull { it.rawId == key }?.birthdays = birthdays.valueAt(i)
+                contactsByIdMap[key]?.birthdays = birthdays.valueAt(i)
             }
 
             val anniversaries = getContactEvents(false)
             size = anniversaries.size
             for (i in 0 until size) {
                 val key = anniversaries.keyAt(i)
-                allContacts.firstOrNull { it.rawId == key }?.anniversaries = anniversaries.valueAt(i)
+                contactsByIdMap[key]?.anniversaries = anniversaries.valueAt(i)
             }
 
             val organizations = getContactOrganization()
             size = organizations.size
             for (i in 0 until size) {
                 val key = organizations.keyAt(i)
-                val contact = allContacts.firstOrNull { it.rawId == key }
+                val contact = contactsByIdMap[key]
                 contact?.company = organizations.valueAt(i).company
                 contact?.jobPosition = organizations.valueAt(i).jobPosition
             }
@@ -188,6 +196,8 @@ class SimpleContactsHelper(val context: Context) {
 
     private fun getContactPhoneNumbers(favoritesOnly: Boolean): ArrayList<SimpleContact> {
         val contacts = ArrayList<SimpleContact>()
+        // Use HashMap for O(1) lookup instead of O(n) firstOrNull
+        val contactsMap = mutableMapOf<Int, SimpleContact>()
         val uri = Phone.CONTENT_URI
         val projection = arrayOf(
             Data.RAW_CONTACT_ID,
@@ -215,13 +225,16 @@ class SimpleContactsHelper(val context: Context) {
             val isPrimary = cursor.getIntValue(Phone.IS_PRIMARY) != 0
             val photoUri = cursor.getStringValue(Phone.PHOTO_URI) ?: ""
 
-            if (contacts.firstOrNull { it.rawId == rawId } == null) {
-                val contact = SimpleContact(rawId, contactId, "", photoUri, ArrayList(), ArrayList(), ArrayList())
+            // Use HashMap lookup for O(1) performance
+            var contact = contactsMap[rawId]
+            if (contact == null) {
+                contact = SimpleContact(rawId, contactId, "", photoUri, ArrayList(), ArrayList(), ArrayList())
                 contacts.add(contact)
+                contactsMap[rawId] = contact
             }
 
             val phoneNumber = PhoneNumber(number, type, label, normalizedNumber, isPrimary)
-            contacts.firstOrNull { it.rawId == rawId }?.phoneNumbers?.add(phoneNumber)
+            contact.phoneNumbers.add(phoneNumber)
         }
         return contacts
     }

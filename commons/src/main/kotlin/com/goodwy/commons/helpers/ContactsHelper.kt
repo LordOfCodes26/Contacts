@@ -121,15 +121,24 @@ class ContactsHelper(val context: Context) {
             RawContacts.ACCOUNT_TYPE
         )
 
+        val thirdPartyTypes = arrayOf(
+            TELEGRAM_PACKAGE,
+            SIGNAL_PACKAGE,
+            WHATSAPP_PACKAGE,
+            THREEMA_PACKAGE,
+            VIBER_PACKAGE
+        )
+
         context.queryCursor(uri, projection) { cursor ->
             val name = cursor.getStringValue(RawContacts.ACCOUNT_NAME) ?: ""
             val type = cursor.getStringValue(RawContacts.ACCOUNT_TYPE) ?: ""
-            var publicName = name
-            if (type == TELEGRAM_PACKAGE) {
-                publicName = context.getString(R.string.telegram)
+            
+            // Filter out third-party messaging app sources
+            if (thirdPartyTypes.contains(type)) {
+                return@queryCursor
             }
 
-            val source = ContactSource(name, type, publicName)
+            val source = ContactSource(name, type, name)
             sources.add(source)
         }
     }
@@ -141,6 +150,13 @@ class ContactsHelper(val context: Context) {
         }
 
         val ignoredSources = ignoredContactSources ?: context.baseConfig.ignoredContactSources
+        val thirdPartyTypes = arrayOf(
+            TELEGRAM_PACKAGE,
+            SIGNAL_PACKAGE,
+            WHATSAPP_PACKAGE,
+            THREEMA_PACKAGE,
+            VIBER_PACKAGE
+        )
         val uri = Data.CONTENT_URI
         val projection = getContactProjection()
 
@@ -152,6 +168,11 @@ class ContactsHelper(val context: Context) {
             context.queryCursor(uri, projection, selection, selectionArgs, sortOrder, true) { cursor ->
                 val accountName = cursor.getStringValue(RawContacts.ACCOUNT_NAME) ?: ""
                 val accountType = cursor.getStringValue(RawContacts.ACCOUNT_TYPE) ?: ""
+
+                // Filter out third-party messaging app contacts
+                if (thirdPartyTypes.contains(accountType)) {
+                    return@queryCursor
+                }
 
                 if (ignoredSources.contains("$accountName:$accountType")) {
                     return@queryCursor
@@ -1026,9 +1047,14 @@ class ContactsHelper(val context: Context) {
             context.baseConfig.wasLocalAccountInitialized = true
         }
 
-        val telegramName = context.getString(R.string.telegram)
-        val viberName = context.getString(R.string.viber)
         val phoneStorageName = context.getString(R.string.phone_storage)
+        val thirdPartyTypes = arrayOf(
+            TELEGRAM_PACKAGE,
+            SIGNAL_PACKAGE,
+            WHATSAPP_PACKAGE,
+            THREEMA_PACKAGE,
+            VIBER_PACKAGE
+        )
         val accounts = AccountManager.get(context).accounts
         val seenAccountKeys = HashSet<String>()
         val existingAccountKeys = HashSet<String>().apply {
@@ -1037,15 +1063,15 @@ class ContactsHelper(val context: Context) {
             }
         }
         for (account in accounts) {
+            // Filter out third-party messaging app sources
+            if (thirdPartyTypes.contains(account.type)) {
+                continue
+            }
+            
             if (ContentResolver.getIsSyncable(account, AUTHORITY) >= 0) {
                 val accountKey = "${account.name}|${account.type}"
                 if (seenAccountKeys.add(accountKey)) {
-                    val publicName = when (account.type) {
-                        TELEGRAM_PACKAGE -> telegramName
-                        VIBER_PACKAGE -> viberName
-                        else -> account.name
-                    }
-                    sources.add(ContactSource(account.name, account.type, publicName))
+                    sources.add(ContactSource(account.name, account.type, account.name))
                 }
             }
         }
@@ -1053,6 +1079,11 @@ class ContactsHelper(val context: Context) {
         var hadEmptyAccount = false
         val contentResolverAccounts = getContentResolverAccounts()
         for (account in contentResolverAccounts) {
+            // Filter out third-party messaging app sources
+            if (thirdPartyTypes.contains(account.type)) {
+                continue
+            }
+            
             when {
                 account.name.isEmpty() && account.type.isEmpty() -> {
                     if (!hadEmptyAccount) {
@@ -1902,6 +1933,13 @@ class ContactsHelper(val context: Context) {
         }
 
         val ignoredSources = context.baseConfig.ignoredContactSources
+        val thirdPartyTypes = arrayOf(
+            TELEGRAM_PACKAGE,
+            SIGNAL_PACKAGE,
+            WHATSAPP_PACKAGE,
+            THREEMA_PACKAGE,
+            VIBER_PACKAGE
+        )
         val uri = Data.CONTENT_URI
         val projection = getContactProjection()
 
@@ -1913,6 +1951,11 @@ class ContactsHelper(val context: Context) {
             context.queryCursor(uri, projection, selection, selectionArgs, sortOrder, true) { cursor ->
                 val accountName = cursor.getStringValue(RawContacts.ACCOUNT_NAME) ?: ""
                 val accountType = cursor.getStringValue(RawContacts.ACCOUNT_TYPE) ?: ""
+
+                // Filter out third-party messaging app contacts
+                if (thirdPartyTypes.contains(accountType)) {
+                    return@queryCursor
+                }
 
                 if (ignoredSources.contains("$accountName:$accountType")) {
                     return@queryCursor
@@ -1983,6 +2026,686 @@ class ContactsHelper(val context: Context) {
         for (i in 0 until size) {
             val key = nicknames.keyAt(i)
             contacts[key]?.nickname = nicknames.valueAt(i)
+        }
+    }
+
+    /**
+     * Check if a contact is stored on SIM card
+     */
+    fun isContactOnSim(contact: Contact): Boolean {
+        val accountType = getContactSourceType(contact.source)
+        // SIM card account types can vary: "com.android.sim", "com.anddroid.contacts.sim", etc.
+        return accountType.contains(".sim", ignoreCase = true) || 
+               accountType.contains("sim", ignoreCase = true) ||
+               contact.source.lowercase().contains("sim")
+    }
+
+    /**
+     * Get SIM card URI (supports dual SIM)
+     * @param simIndex 0 for SIM1, 1 for SIM2
+     */
+    private fun getSimUri(simIndex: Int = context.baseConfig.currentSIMCardIndex): Uri {
+        return if (simIndex == 0) {
+            "content://icc/adn".toUri()
+        } else {
+            "content://icc${simIndex + 1}/adn".toUri()
+        }
+    }
+
+    /**
+     * Move contacts from SIM card to Phone storage
+     */
+    fun moveContactsFromSimToPhone(contacts: ArrayList<Contact>, callback: (success: Boolean, movedCount: Int) -> Unit) {
+        ensureBackgroundThread {
+            var movedCount = 0
+            var hasError = false
+
+            contacts.forEach { contact ->
+                if (!isContactOnSim(contact)) {
+                    return@forEach
+                }
+
+                try {
+                    // Create a copy of the contact for phone storage
+                    val phoneContact = contact.copy()
+                    phoneContact.source = "" // Empty source means phone storage
+                    
+                    // Delete from SIM first
+                    val simUri = getSimUri()
+                    val simProjection = arrayOf("_id", "tag", "number")
+                    val simCursor = context.contentResolver.query(simUri, simProjection, null, null, null)
+                    
+                    simCursor?.use { cursor ->
+                        while (cursor.moveToNext()) {
+                            val simName = cursor.getString(cursor.getColumnIndexOrThrow("tag")) ?: ""
+                            val simNumber = cursor.getString(cursor.getColumnIndexOrThrow("number")) ?: ""
+                            
+                            // Match by name and first phone number
+                            if (simName == contact.getNameToDisplay() && 
+                                contact.phoneNumbers.firstOrNull()?.value == simNumber) {
+                                val simId = cursor.getLong(cursor.getColumnIndexOrThrow("_id"))
+                                val deleteUri = ContentUris.withAppendedId(simUri, simId)
+                                context.contentResolver.delete(deleteUri, null, null)
+                                break
+                            }
+                        }
+                    }
+                    
+                    // Insert to phone storage
+                    if (insertContact(phoneContact)) {
+                        // Delete the old SIM contact from Contacts Provider
+                        deleteContacts(arrayListOf(contact))
+                        movedCount++
+                    } else {
+                        hasError = true
+                    }
+                } catch (e: Exception) {
+                    context.showErrorToast(e)
+                    hasError = true
+                }
+            }
+
+            Handler(Looper.getMainLooper()).post {
+                callback(!hasError, movedCount)
+            }
+        }
+    }
+
+    /**
+     * Move contacts from Phone storage to SIM card
+     * Note: SIM cards only support name and phone number, other data will be lost
+     */
+    fun moveContactsFromPhoneToSim(contacts: ArrayList<Contact>, callback: (success: Boolean, movedCount: Int) -> Unit) {
+        ensureBackgroundThread {
+            var movedCount = 0
+            var hasError = false
+
+            contacts.forEach { contact ->
+                if (isContactOnSim(contact)) {
+                    return@forEach
+                }
+
+                // SIM cards only support one phone number
+                val phoneNumber = contact.phoneNumbers.firstOrNull()?.value
+                if (phoneNumber.isNullOrEmpty()) {
+                    hasError = true
+                    return@forEach
+                }
+
+                try {
+                    val simUri = getSimUri()
+                    val name = contact.getNameToDisplay()
+                    
+                    // Check if SIM has space (this is a limitation - we can't easily check available space)
+                    // Insert to SIM
+                    val values = ContentValues().apply {
+                        put("number", phoneNumber)
+                        put("tag", name)
+                    }
+                    
+                    val result = context.contentResolver.insert(simUri, values)
+                    if (result != null) {
+                        // Create contact in Contacts Provider with SIM source
+                        val simContact = contact.copy()
+                        simContact.source = "SIM" // SIM account name
+                        simContact.phoneNumbers = arrayListOf(contact.phoneNumbers.first())
+                        // Remove unsupported fields for SIM
+                        simContact.emails.clear()
+                        simContact.addresses.clear()
+                        simContact.notes = ""
+                        simContact.websites.clear()
+                        simContact.relations.clear()
+                        simContact.IMs.clear()
+                        simContact.organization = Organization("", "")
+                        simContact.photoUri = ""
+                        simContact.thumbnailUri = ""
+                        
+                        // Insert to Contacts Provider with SIM account
+                        val operations = ArrayList<ContentProviderOperation>()
+                        ContentProviderOperation.newInsert(RawContacts.CONTENT_URI).apply {
+                            withValue(RawContacts.ACCOUNT_NAME, "SIM")
+                            withValue(RawContacts.ACCOUNT_TYPE, "com.android.sim")
+                            operations.add(build())
+                        }
+                        
+                        ContentProviderOperation.newInsert(Data.CONTENT_URI).apply {
+                            withValueBackReference(Data.RAW_CONTACT_ID, 0)
+                            withValue(Data.MIMETYPE, CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
+                            withValue(CommonDataKinds.StructuredName.GIVEN_NAME, contact.firstName)
+                            withValue(CommonDataKinds.StructuredName.FAMILY_NAME, contact.surname)
+                            operations.add(build())
+                        }
+                        
+                        ContentProviderOperation.newInsert(Data.CONTENT_URI).apply {
+                            withValueBackReference(Data.RAW_CONTACT_ID, 0)
+                            withValue(Data.MIMETYPE, CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
+                            withValue(CommonDataKinds.Phone.NUMBER, phoneNumber)
+                            withValue(CommonDataKinds.Phone.NORMALIZED_NUMBER, phoneNumber.normalizePhoneNumber())
+                            withValue(CommonDataKinds.Phone.TYPE, CommonDataKinds.Phone.TYPE_MOBILE)
+                            operations.add(build())
+                        }
+                        
+                        context.contentResolver.applyBatch(AUTHORITY, operations)
+                        
+                        // Delete from phone storage
+                        deleteContacts(arrayListOf(contact))
+                        movedCount++
+                    } else {
+                        hasError = true
+                    }
+                } catch (e: Exception) {
+                    context.showErrorToast(e)
+                    hasError = true
+                }
+            }
+
+            Handler(Looper.getMainLooper()).post {
+                callback(!hasError, movedCount)
+            }
+        }
+    }
+
+    /**
+     * Copy contacts from SIM card to Phone storage (keeps original on SIM)
+     */
+    fun copyContactsFromSimToPhone(contacts: ArrayList<Contact>, callback: (success: Boolean, copiedCount: Int) -> Unit) {
+        ensureBackgroundThread {
+            var copiedCount = 0
+            var hasError = false
+
+            contacts.forEach { contact ->
+                if (!isContactOnSim(contact)) {
+                    return@forEach
+                }
+
+                try {
+                    val phoneContact = contact.copy()
+                    phoneContact.source = "" // Empty source means phone storage
+                    
+                    if (insertContact(phoneContact)) {
+                        copiedCount++
+                    } else {
+                        hasError = true
+                    }
+                } catch (e: Exception) {
+                    context.showErrorToast(e)
+                    hasError = true
+                }
+            }
+
+            Handler(Looper.getMainLooper()).post {
+                callback(!hasError, copiedCount)
+            }
+        }
+    }
+
+    /**
+     * Copy contacts from Phone storage to SIM card (keeps original on phone)
+     * Note: SIM cards only support name and phone number
+     */
+    fun copyContactsFromPhoneToSim(contacts: ArrayList<Contact>, callback: (success: Boolean, copiedCount: Int) -> Unit) {
+        ensureBackgroundThread {
+            var copiedCount = 0
+            var hasError = false
+
+            contacts.forEach { contact ->
+                if (isContactOnSim(contact)) {
+                    return@forEach
+                }
+
+                val phoneNumber = contact.phoneNumbers.firstOrNull()?.value
+                if (phoneNumber.isNullOrEmpty()) {
+                    hasError = true
+                    return@forEach
+                }
+
+                try {
+                    val simUri = getSimUri()
+                    val name = contact.getNameToDisplay()
+                    
+                    val values = ContentValues().apply {
+                        put("number", phoneNumber)
+                        put("tag", name)
+                    }
+                    
+                    val result = context.contentResolver.insert(simUri, values)
+                    if (result != null) {
+                        // Also create in Contacts Provider with SIM source
+                        val simContact = contact.copy()
+                        simContact.source = "SIM"
+                        simContact.phoneNumbers = arrayListOf(contact.phoneNumbers.first())
+                        simContact.emails.clear()
+                        simContact.addresses.clear()
+                        simContact.notes = ""
+                        simContact.websites.clear()
+                        simContact.relations.clear()
+                        simContact.IMs.clear()
+                        simContact.organization = Organization("", "")
+                        simContact.photoUri = ""
+                        simContact.thumbnailUri = ""
+                        
+                        val operations = ArrayList<ContentProviderOperation>()
+                        ContentProviderOperation.newInsert(RawContacts.CONTENT_URI).apply {
+                            withValue(RawContacts.ACCOUNT_NAME, "SIM")
+                            withValue(RawContacts.ACCOUNT_TYPE, "com.android.sim")
+                            operations.add(build())
+                        }
+                        
+                        ContentProviderOperation.newInsert(Data.CONTENT_URI).apply {
+                            withValueBackReference(Data.RAW_CONTACT_ID, 0)
+                            withValue(Data.MIMETYPE, CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
+                            withValue(CommonDataKinds.StructuredName.GIVEN_NAME, contact.firstName)
+                            withValue(CommonDataKinds.StructuredName.FAMILY_NAME, contact.surname)
+                            operations.add(build())
+                        }
+                        
+                        ContentProviderOperation.newInsert(Data.CONTENT_URI).apply {
+                            withValueBackReference(Data.RAW_CONTACT_ID, 0)
+                            withValue(Data.MIMETYPE, CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
+                            withValue(CommonDataKinds.Phone.NUMBER, phoneNumber)
+                            withValue(CommonDataKinds.Phone.NORMALIZED_NUMBER, phoneNumber.normalizePhoneNumber())
+                            withValue(CommonDataKinds.Phone.TYPE, CommonDataKinds.Phone.TYPE_MOBILE)
+                            operations.add(build())
+                        }
+                        
+                        context.contentResolver.applyBatch(AUTHORITY, operations)
+                        copiedCount++
+                    } else {
+                        hasError = true
+                    }
+                } catch (e: Exception) {
+                    context.showErrorToast(e)
+                    hasError = true
+                }
+            }
+
+            Handler(Looper.getMainLooper()).post {
+                callback(!hasError, copiedCount)
+            }
+        }
+    }
+
+    /**
+     * Get SIM1 URI
+     */
+    private fun getSim1Uri(): Uri {
+        return "content://icc/adn".toUri()
+    }
+
+    /**
+     * Get SIM2 URI
+     */
+    private fun getSim2Uri(): Uri {
+        return "content://icc2/adn".toUri()
+    }
+
+    /**
+     * Check if contact is on SIM1
+     */
+    private fun isContactOnSim1(contact: Contact): Boolean {
+        val accountType = getContactSourceType(contact.source)
+        return (accountType.contains("sim", ignoreCase = true) && 
+               !accountType.contains("sim2", ignoreCase = true) &&
+               contact.source.lowercase() != "sim2") ||
+               (isContactOnSim(contact) && !isContactOnSim2(contact))
+    }
+
+    /**
+     * Check if contact is on SIM2
+     */
+    private fun isContactOnSim2(contact: Contact): Boolean {
+        val accountType = getContactSourceType(contact.source)
+        return accountType.contains("sim2", ignoreCase = true) ||
+               contact.source.lowercase() == "sim2"
+    }
+
+    /**
+     * Update contact's SIM source in Contacts Provider
+     */
+    private fun updateContactSimSource(contact: Contact, simIndex: Int) {
+        try {
+            val accountName = if (simIndex == 0) "SIM" else "SIM2"
+            val accountType = if (simIndex == 0) "com.android.sim" else "com.android.sim2"
+
+            val operations = ArrayList<ContentProviderOperation>()
+            ContentProviderOperation.newUpdate(RawContacts.CONTENT_URI).apply {
+                val selection = "${RawContacts._ID} = ?"
+                val selectionArgs = arrayOf(contact.id.toString())
+                withSelection(selection, selectionArgs)
+                withValue(RawContacts.ACCOUNT_NAME, accountName)
+                withValue(RawContacts.ACCOUNT_TYPE, accountType)
+                operations.add(build())
+            }
+
+            context.contentResolver.applyBatch(AUTHORITY, operations)
+        } catch (e: Exception) {
+            context.showErrorToast(e)
+        }
+    }
+
+    /**
+     * Move contacts from SIM1 to SIM2
+     * Note: SIM cards only support name and phone number
+     */
+    fun moveContactsFromSim1ToSim2(contacts: ArrayList<Contact>, callback: (success: Boolean, movedCount: Int) -> Unit) {
+        ensureBackgroundThread {
+            var movedCount = 0
+            var hasError = false
+
+            contacts.forEach { contact ->
+                // Verify contact is on SIM1
+                if (!isContactOnSim(contact) || !isContactOnSim1(contact)) {
+                    return@forEach
+                }
+
+                val phoneNumber = contact.phoneNumbers.firstOrNull()?.value
+                if (phoneNumber.isNullOrEmpty()) {
+                    hasError = true
+                    return@forEach
+                }
+
+                try {
+                    val name = contact.getNameToDisplay()
+                    val sim1Uri = getSim1Uri()
+                    val sim2Uri = getSim2Uri()
+
+                    // Find and delete from SIM1
+                    val sim1Projection = arrayOf("_id", "tag", "number")
+                    val sim1Cursor = context.contentResolver.query(sim1Uri, sim1Projection, null, null, null)
+                    var sim1Id: Long? = null
+
+                    sim1Cursor?.use { cursor ->
+                        while (cursor.moveToNext()) {
+                            val simName = cursor.getString(cursor.getColumnIndexOrThrow("tag")) ?: ""
+                            val simNumber = cursor.getString(cursor.getColumnIndexOrThrow("number")) ?: ""
+
+                            if (simName == name && simNumber == phoneNumber) {
+                                sim1Id = cursor.getLong(cursor.getColumnIndexOrThrow("_id"))
+                                break
+                            }
+                        }
+                    }
+
+                    if (sim1Id == null) {
+                        hasError = true
+                        return@forEach
+                    }
+
+                    // Insert to SIM2
+                    val values = ContentValues().apply {
+                        put("number", phoneNumber)
+                        put("tag", name)
+                    }
+
+                    val result = context.contentResolver.insert(sim2Uri, values)
+                    if (result != null) {
+                        // Delete from SIM1
+                        val deleteUri = ContentUris.withAppendedId(sim1Uri, sim1Id)
+                        context.contentResolver.delete(deleteUri, null, null)
+
+                        // Update Contacts Provider to reflect SIM2 source
+                        updateContactSimSource(contact, 1) // 1 = SIM2
+                        movedCount++
+                    } else {
+                        hasError = true
+                    }
+                } catch (e: Exception) {
+                    context.showErrorToast(e)
+                    hasError = true
+                }
+            }
+
+            Handler(Looper.getMainLooper()).post {
+                callback(!hasError, movedCount)
+            }
+        }
+    }
+
+    /**
+     * Move contacts from SIM2 to SIM1
+     * Note: SIM cards only support name and phone number
+     */
+    fun moveContactsFromSim2ToSim1(contacts: ArrayList<Contact>, callback: (success: Boolean, movedCount: Int) -> Unit) {
+        ensureBackgroundThread {
+            var movedCount = 0
+            var hasError = false
+
+            contacts.forEach { contact ->
+                // Verify contact is on SIM2
+                if (!isContactOnSim(contact) || !isContactOnSim2(contact)) {
+                    return@forEach
+                }
+
+                val phoneNumber = contact.phoneNumbers.firstOrNull()?.value
+                if (phoneNumber.isNullOrEmpty()) {
+                    hasError = true
+                    return@forEach
+                }
+
+                try {
+                    val name = contact.getNameToDisplay()
+                    val sim1Uri = getSim1Uri()
+                    val sim2Uri = getSim2Uri()
+
+                    // Find and delete from SIM2
+                    val sim2Projection = arrayOf("_id", "tag", "number")
+                    val sim2Cursor = context.contentResolver.query(sim2Uri, sim2Projection, null, null, null)
+                    var sim2Id: Long? = null
+
+                    sim2Cursor?.use { cursor ->
+                        while (cursor.moveToNext()) {
+                            val simName = cursor.getString(cursor.getColumnIndexOrThrow("tag")) ?: ""
+                            val simNumber = cursor.getString(cursor.getColumnIndexOrThrow("number")) ?: ""
+
+                            if (simName == name && simNumber == phoneNumber) {
+                                sim2Id = cursor.getLong(cursor.getColumnIndexOrThrow("_id"))
+                                break
+                            }
+                        }
+                    }
+
+                    if (sim2Id == null) {
+                        hasError = true
+                        return@forEach
+                    }
+
+                    // Insert to SIM1
+                    val values = ContentValues().apply {
+                        put("number", phoneNumber)
+                        put("tag", name)
+                    }
+
+                    val result = context.contentResolver.insert(sim1Uri, values)
+                    if (result != null) {
+                        // Delete from SIM2
+                        val deleteUri = ContentUris.withAppendedId(sim2Uri, sim2Id)
+                        context.contentResolver.delete(deleteUri, null, null)
+
+                        // Update Contacts Provider to reflect SIM1 source
+                        updateContactSimSource(contact, 0) // 0 = SIM1
+                        movedCount++
+                    } else {
+                        hasError = true
+                    }
+                } catch (e: Exception) {
+                    context.showErrorToast(e)
+                    hasError = true
+                }
+            }
+
+            Handler(Looper.getMainLooper()).post {
+                callback(!hasError, movedCount)
+            }
+        }
+    }
+
+    /**
+     * Copy contacts from SIM1 to SIM2 (keeps original on SIM1)
+     */
+    fun copyContactsFromSim1ToSim2(contacts: ArrayList<Contact>, callback: (success: Boolean, copiedCount: Int) -> Unit) {
+        ensureBackgroundThread {
+            var copiedCount = 0
+            var hasError = false
+
+            contacts.forEach { contact ->
+                if (!isContactOnSim(contact) || !isContactOnSim1(contact)) {
+                    return@forEach
+                }
+
+                val phoneNumber = contact.phoneNumbers.firstOrNull()?.value
+                if (phoneNumber.isNullOrEmpty()) {
+                    hasError = true
+                    return@forEach
+                }
+
+                try {
+                    val sim2Uri = getSim2Uri()
+                    val name = contact.getNameToDisplay()
+
+                    val values = ContentValues().apply {
+                        put("number", phoneNumber)
+                        put("tag", name)
+                    }
+
+                    val result = context.contentResolver.insert(sim2Uri, values)
+                    if (result != null) {
+                        // Create a new contact entry in Contacts Provider for SIM2
+                        val sim2Contact = contact.copy()
+                        sim2Contact.source = "SIM2"
+                        sim2Contact.phoneNumbers = arrayListOf(contact.phoneNumbers.first())
+                        sim2Contact.emails.clear()
+                        sim2Contact.addresses.clear()
+                        sim2Contact.notes = ""
+                        sim2Contact.websites.clear()
+                        sim2Contact.relations.clear()
+                        sim2Contact.IMs.clear()
+                        sim2Contact.organization = Organization("", "")
+                        sim2Contact.photoUri = ""
+                        sim2Contact.thumbnailUri = ""
+
+                        val operations = ArrayList<ContentProviderOperation>()
+                        ContentProviderOperation.newInsert(RawContacts.CONTENT_URI).apply {
+                            withValue(RawContacts.ACCOUNT_NAME, "SIM2")
+                            withValue(RawContacts.ACCOUNT_TYPE, "com.android.sim2")
+                            operations.add(build())
+                        }
+
+                        ContentProviderOperation.newInsert(Data.CONTENT_URI).apply {
+                            withValueBackReference(Data.RAW_CONTACT_ID, 0)
+                            withValue(Data.MIMETYPE, CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
+                            withValue(CommonDataKinds.StructuredName.GIVEN_NAME, contact.firstName)
+                            withValue(CommonDataKinds.StructuredName.FAMILY_NAME, contact.surname)
+                            operations.add(build())
+                        }
+
+                        ContentProviderOperation.newInsert(Data.CONTENT_URI).apply {
+                            withValueBackReference(Data.RAW_CONTACT_ID, 0)
+                            withValue(Data.MIMETYPE, CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
+                            withValue(CommonDataKinds.Phone.NUMBER, phoneNumber)
+                            withValue(CommonDataKinds.Phone.NORMALIZED_NUMBER, phoneNumber.normalizePhoneNumber())
+                            withValue(CommonDataKinds.Phone.TYPE, CommonDataKinds.Phone.TYPE_MOBILE)
+                            operations.add(build())
+                        }
+
+                        context.contentResolver.applyBatch(AUTHORITY, operations)
+                        copiedCount++
+                    } else {
+                        hasError = true
+                    }
+                } catch (e: Exception) {
+                    context.showErrorToast(e)
+                    hasError = true
+                }
+            }
+
+            Handler(Looper.getMainLooper()).post {
+                callback(!hasError, copiedCount)
+            }
+        }
+    }
+
+    /**
+     * Copy contacts from SIM2 to SIM1 (keeps original on SIM2)
+     */
+    fun copyContactsFromSim2ToSim1(contacts: ArrayList<Contact>, callback: (success: Boolean, copiedCount: Int) -> Unit) {
+        ensureBackgroundThread {
+            var copiedCount = 0
+            var hasError = false
+
+            contacts.forEach { contact ->
+                if (!isContactOnSim(contact) || !isContactOnSim2(contact)) {
+                    return@forEach
+                }
+
+                val phoneNumber = contact.phoneNumbers.firstOrNull()?.value
+                if (phoneNumber.isNullOrEmpty()) {
+                    hasError = true
+                    return@forEach
+                }
+
+                try {
+                    val sim1Uri = getSim1Uri()
+                    val name = contact.getNameToDisplay()
+
+                    val values = ContentValues().apply {
+                        put("number", phoneNumber)
+                        put("tag", name)
+                    }
+
+                    val result = context.contentResolver.insert(sim1Uri, values)
+                    if (result != null) {
+                        // Create a new contact entry in Contacts Provider for SIM1
+                        val sim1Contact = contact.copy()
+                        sim1Contact.source = "SIM"
+                        sim1Contact.phoneNumbers = arrayListOf(contact.phoneNumbers.first())
+                        sim1Contact.emails.clear()
+                        sim1Contact.addresses.clear()
+                        sim1Contact.notes = ""
+                        sim1Contact.websites.clear()
+                        sim1Contact.relations.clear()
+                        sim1Contact.IMs.clear()
+                        sim1Contact.organization = Organization("", "")
+                        sim1Contact.photoUri = ""
+                        sim1Contact.thumbnailUri = ""
+
+                        val operations = ArrayList<ContentProviderOperation>()
+                        ContentProviderOperation.newInsert(RawContacts.CONTENT_URI).apply {
+                            withValue(RawContacts.ACCOUNT_NAME, "SIM")
+                            withValue(RawContacts.ACCOUNT_TYPE, "com.android.sim")
+                            operations.add(build())
+                        }
+
+                        ContentProviderOperation.newInsert(Data.CONTENT_URI).apply {
+                            withValueBackReference(Data.RAW_CONTACT_ID, 0)
+                            withValue(Data.MIMETYPE, CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
+                            withValue(CommonDataKinds.StructuredName.GIVEN_NAME, contact.firstName)
+                            withValue(CommonDataKinds.StructuredName.FAMILY_NAME, contact.surname)
+                            operations.add(build())
+                        }
+
+                        ContentProviderOperation.newInsert(Data.CONTENT_URI).apply {
+                            withValueBackReference(Data.RAW_CONTACT_ID, 0)
+                            withValue(Data.MIMETYPE, CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
+                            withValue(CommonDataKinds.Phone.NUMBER, phoneNumber)
+                            withValue(CommonDataKinds.Phone.NORMALIZED_NUMBER, phoneNumber.normalizePhoneNumber())
+                            withValue(CommonDataKinds.Phone.TYPE, CommonDataKinds.Phone.TYPE_MOBILE)
+                            operations.add(build())
+                        }
+
+                        context.contentResolver.applyBatch(AUTHORITY, operations)
+                        copiedCount++
+                    } else {
+                        hasError = true
+                    }
+                } catch (e: Exception) {
+                    context.showErrorToast(e)
+                    hasError = true
+                }
+            }
+
+            Handler(Looper.getMainLooper()).post {
+                callback(!hasError, copiedCount)
+            }
         }
     }
 }
