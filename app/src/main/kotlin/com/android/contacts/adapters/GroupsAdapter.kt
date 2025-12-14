@@ -2,8 +2,10 @@ package com.android.contacts.adapters
 
 import android.util.TypedValue
 import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.widget.PopupMenu
 import com.behaviorule.arturdumchev.library.pixels
 import com.qtalk.recyclerviewfastscroller.RecyclerViewFastScroller
 import com.goodwy.commons.adapters.MyRecyclerViewAdapter
@@ -73,10 +75,52 @@ class GroupsAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val group = groups[position]
-        holder.bindView(group, true, true) { itemView, layoutPosition ->
+        holder.bindView(group, true, false) { itemView, layoutPosition ->
             setupView(itemView, group)
         }
+        // Set custom long click listener to show popup menu
+        holder.itemView.setOnLongClickListener {
+            showPopupMenu(holder.itemView, position, group)
+            true
+        }
         bindViewHolder(holder)
+    }
+
+    private fun showPopupMenu(anchor: View, position: Int, group: Group) {
+        val popupMenu = PopupMenu(activity, anchor)
+        activity.menuInflater.inflate(R.menu.cab_groups, popupMenu.menu)
+        
+        // Prepare menu (similar to prepareActionMode)
+        val menu = popupMenu.menu
+        menu.findItem(R.id.cab_rename).isVisible = true // Always show rename for single item
+        
+        popupMenu.setOnMenuItemClickListener { item: MenuItem ->
+            val groupId = group.id!!.toInt()
+            
+            // Handle the menu item action
+            when (item.itemId) {
+                R.id.cab_rename -> {
+                    // Rename directly without selecting
+                    renameGroup(group)
+                    true
+                }
+                R.id.cab_select_all -> {
+                    selectAll()
+                    true
+                }
+                R.id.cab_delete -> {
+                    // Select the item and delete
+                    if (!selectedKeys.contains(groupId)) {
+                        toggleItemSelection(true, position, true)
+                    }
+                    askConfirmDelete()
+                    true
+                }
+                else -> false
+            }
+        }
+        
+        popupMenu.show()
     }
 
     override fun getItemCount() = groups.size
@@ -99,6 +143,12 @@ class GroupsAdapter(
         val group = getItemWithKey(selectedKeys.first()) ?: return
         RenameGroupDialog(activity, group) {
             finishActMode()
+            refreshListener?.refreshContacts(TAB_GROUPS)
+        }
+    }
+
+    private fun renameGroup(group: Group) {
+        RenameGroupDialog(activity, group) {
             refreshListener?.refreshContacts(TAB_GROUPS)
         }
     }

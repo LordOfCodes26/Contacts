@@ -9,9 +9,10 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.goodwy.commons.R
 import com.goodwy.commons.interfaces.RecyclerScrollCallback
+import com.goodwy.commons.views.bouncy.BouncyRecyclerView
 
 // drag selection is based on https://github.com/afollestad/drag-select-recyclerview
-open class MyRecyclerView : RecyclerView {
+open class MyRecyclerView : BouncyRecyclerView {
     private val AUTO_SCROLL_DELAY = 25L
     private var isZoomEnabled = false
     private var isDragSelectionEnabled = false
@@ -57,7 +58,7 @@ open class MyRecyclerView : RecyclerView {
     private var lastMaxItemIndex = 0
     private var linearLayoutManager: LinearLayoutManager? = null
 
-    constructor(context: Context) : super(context)
+    constructor(context: Context) : super(context, null)
 
     constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
 
@@ -109,7 +110,7 @@ open class MyRecyclerView : RecyclerView {
         totalItemCount = 0
     }
 
-    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (!dragSelectActive) {
             try {
                 super.dispatchTouchEvent(ev)
@@ -195,10 +196,15 @@ open class MyRecyclerView : RecyclerView {
         return if (isZoomEnabled) {
             scaleDetector.onTouchEvent(ev)
         } else {
-            true
+            super.dispatchTouchEvent(ev)
         }
     }
-
+    
+    override fun onTouchEvent(e: MotionEvent?): Boolean {
+        // Call parent to track touched state for bouncy effects
+        return super.onTouchEvent(e)
+    }
+    
     fun setupDragListener(dragListener: MyDragListener?) {
         isDragSelectionEnabled = dragListener != null
         this.dragListener = dragListener

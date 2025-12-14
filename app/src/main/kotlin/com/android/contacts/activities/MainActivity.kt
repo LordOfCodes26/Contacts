@@ -90,7 +90,7 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
         updateMaterialActivityViews(
             binding.mainCoordinator,
             binding.mainHolder,
-            useTransparentNavigation = false,
+            useTransparentNavigation = true,
             useTopSearchMenu = useBottomNavigationBar
         )
         storeStateVariables()
@@ -135,6 +135,7 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
             System.exit(0)
             return
         }
+        updateNavigationBarColor(getSurfaceColor())
 
         @SuppressLint("UnsafeIntentLaunch")
         if (config.needRestart || storedBackgroundColor != getProperBackgroundColor()) {

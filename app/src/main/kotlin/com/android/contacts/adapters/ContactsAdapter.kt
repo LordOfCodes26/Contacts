@@ -10,14 +10,17 @@ import android.graphics.drawable.Icon
 import android.graphics.drawable.LayerDrawable
 import android.util.TypedValue
 import android.view.Menu
+import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.PopupMenu
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.RelativeLayout
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.behaviorule.arturdumchev.library.pixels
@@ -196,19 +199,75 @@ class ContactsAdapter(
         bindViewHolder(holder)
     }
 
+    private fun handleContactClick(contact: Contact) {
+        if (actModeCallback.isSelectable) {
+            val position = contactItems.indexOf(contact)
+            if (position >= 0) {
+                val isSelected = selectedKeys.contains(contact.id)
+                toggleItemSelection(!isSelected, position, true)
+            }
+        } else {
+            itemClick.invoke(contact)
+        }
+    }
+
     override fun getItemCount() = contactItems.size
 
     private fun getItemWithKey(key: Int): Contact? = contactItems.firstOrNull { it.id == key }
 
     fun updateItems(newItems: List<Contact>, highlightText: String = "") {
-        if (newItems.hashCode() != contactItems.hashCode()) {
+        val oldItems = contactItems
+        val highlightChanged = textToHighlight != highlightText
+        
+        if (newItems.hashCode() != oldItems.hashCode() || highlightChanged) {
+            textToHighlight = highlightText
+            
+            // Invalidate last item cache when items change
+            cachedLastItem = null
+            cachedLastItemSize = 0
+            
+            // Use DiffUtil for efficient updates instead of notifyDataSetChanged
+            val diffCallback = ContactDiffCallback(oldItems, newItems, highlightChanged)
+            val diffResult = DiffUtil.calculateDiff(diffCallback, false)
+            
             contactItems = newItems.toMutableList()
-            textToHighlight = highlightText
-            notifyDataSetChanged()
-            finishActMode()
-        } else if (textToHighlight != highlightText) {
-            textToHighlight = highlightText
-            notifyDataSetChanged()
+            diffResult.dispatchUpdatesTo(this)
+            
+            if (newItems.hashCode() != oldItems.hashCode()) {
+                finishActMode()
+            }
+        }
+    }
+    
+    private class ContactDiffCallback(
+        private val oldList: List<Contact>,
+        private val newList: List<Contact>,
+        private val highlightChanged: Boolean
+    ) : DiffUtil.Callback() {
+        
+        override fun getOldListSize(): Int = oldList.size
+        
+        override fun getNewListSize(): Int = newList.size
+        
+        override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            return oldList[oldItemPosition].id == newList[newItemPosition].id
+        }
+        
+        override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            val oldContact = oldList[oldItemPosition]
+            val newContact = newList[newItemPosition]
+            
+            // If highlight changed, we need to rebind to update text highlighting
+            if (highlightChanged) {
+                return false
+            }
+            
+            // Compare key properties that affect display
+            return oldContact.id == newContact.id &&
+                   oldContact.getNameToDisplay() == newContact.getNameToDisplay() &&
+                   (oldContact.phoneNumbers.firstOrNull()?.value ?: "") == (newContact.phoneNumbers.firstOrNull()?.value ?: "") &&
+                   oldContact.photoUri == newContact.photoUri &&
+                   oldContact.starred == newContact.starred
         }
     }
 
@@ -435,7 +494,17 @@ class ContactsAdapter(
 
     private fun getSelectedItems() = contactItems.filter { selectedKeys.contains(it.id) } as ArrayList<Contact>
 
-    private fun getLastItem() = contactItems.last()
+    private var cachedLastItem: Contact? = null
+    private var cachedLastItemSize = 0
+    
+    private fun getLastItem(): Contact? {
+        // Cache the last item to avoid calling last() on every bind
+        if (cachedLastItemSize != contactItems.size) {
+            cachedLastItem = contactItems.lastOrNull()
+            cachedLastItemSize = contactItems.size
+        }
+        return cachedLastItem
+    }
 
     override fun onViewRecycled(holder: ViewHolder) {
         super.onViewRecycled(holder)

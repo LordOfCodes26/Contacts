@@ -6,6 +6,7 @@ import android.content.res.Configuration
 import android.util.AttributeSet
 import androidx.recyclerview.widget.RecyclerView
 import com.goodwy.commons.extensions.*
+import com.goodwy.commons.helpers.ensureBackgroundThread
 import com.goodwy.commons.models.contacts.Contact
 import com.android.contacts.R
 import com.android.contacts.activities.EditContactActivity
@@ -60,24 +61,50 @@ class ContactsFragment(context: Context, attributeSet: AttributeSet) : MyViewPag
             false
         }
 
+        // Optimize RecyclerView for large lists
+        innerBinding.fragmentList.setHasFixedSize(true)
+        // Disable animations for large lists to improve scrolling performance
+        if (contacts.size > 100) {
+            innerBinding.fragmentList.itemAnimator = null
+        }
+        innerBinding.fragmentList.setItemViewCacheSize(30) // Increase cache size for smoother scrolling
+        innerBinding.fragmentList.recycledViewPool.setMaxRecycledViews(0, 30) // Increase pool size
+
         if (showFastscroller) {
-            try {
-                //Decrease the font size based on the number of letters in the letter scroller
-                val allNotEmpty = contacts.filter { it.getNameToDisplay().isNotEmpty() }
-                val all = allNotEmpty.map { it.getNameToDisplay().substring(0, 1) }
-                val unique: Set<String> = HashSet(all)
-                val sizeUnique = unique.size
-                if (isHighScreenSize()) {
-                    if (sizeUnique > 48) innerBinding.letterFastscroller.textAppearanceRes = R.style.LetterFastscrollerStyleTooTiny
-                    else if (sizeUnique > 37) innerBinding.letterFastscroller.textAppearanceRes = R.style.LetterFastscrollerStyleTiny
-                    else innerBinding.letterFastscroller.textAppearanceRes = R.style.LetterFastscrollerStyleSmall
-                } else {
-                    if (sizeUnique > 36) innerBinding.letterFastscroller.textAppearanceRes = R.style.LetterFastscrollerStyleTooTiny
-                    else if (sizeUnique > 30) innerBinding.letterFastscroller.textAppearanceRes = R.style.LetterFastscrollerStyleTiny
-                    else innerBinding.letterFastscroller.textAppearanceRes = R.style.LetterFastscrollerStyleSmall
+            // Check screen size on main thread before background processing
+            val isHighScreen = isHighScreenSize()
+            
+            // Move expensive calculation to background thread
+            ensureBackgroundThread {
+                try {
+                    //Decrease the font size based on the number of letters in the letter scroller
+                    val allNotEmpty = contacts.filter { it.getNameToDisplay().isNotEmpty() }
+                    val all = allNotEmpty.map { it.getNameToDisplay().substring(0, 1) }
+                    val unique: Set<String> = HashSet(all)
+                    val sizeUnique = unique.size
+                    val textAppearanceRes = if (isHighScreen) {
+                        when {
+                            sizeUnique > 48 -> R.style.LetterFastscrollerStyleTooTiny
+                            sizeUnique > 37 -> R.style.LetterFastscrollerStyleTiny
+                            else -> R.style.LetterFastscrollerStyleSmall
+                        }
+                    } else {
+                        when {
+                            sizeUnique > 36 -> R.style.LetterFastscrollerStyleTooTiny
+                            sizeUnique > 30 -> R.style.LetterFastscrollerStyleTiny
+                            else -> R.style.LetterFastscrollerStyleSmall
+                        }
+                    }
+                    
+                    activity?.runOnUiThread {
+                        innerBinding.letterFastscroller.textAppearanceRes = textAppearanceRes
+                    }
+                } catch (e: Exception) {
+                    activity?.runOnUiThread {
+                        activity?.copyToClipboard(e.toString())
+                    }
                 }
-            } catch (e: Exception) {
-                activity?.copyToClipboard(e.toString()) }
+            }
         }
 
         if (currAdapter == null || forceListRedraw) {
